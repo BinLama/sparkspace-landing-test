@@ -9,6 +9,12 @@ import {
   CssBaseline,
   AppBar,
   Toolbar,
+  ButtonGroup,
+  Popper,
+  Grow,
+  ClickAwayListener,
+  MenuList,
+  MenuItem,
 } from "@mui/material";
 import Logo from "../public/logo.svg";
 
@@ -22,13 +28,107 @@ import RubricIcon from "./assets/landing/rubric.svg";
 import GradedPaperIcon from "./assets/landing/paper.svg";
 import WarningIcon from "./assets/landing/warning.svg";
 import { Gauge } from "@mui/x-charts/Gauge";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+// icons
+import DriveFolderUploadIcon from "@mui/icons-material/DriveFolderUpload";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import CloudDoneIcon from "@mui/icons-material/CloudDone";
 
 const CANNED_FEEDBACK =
   "**Summary Evaluation Against Rubric: Accuracy (10/10):** The essay presents accurate information about Abraham Lincoln's life, presidency, and significant contributions, including key events like his election, the Civil...";
 
+const DROPDOWN_OPTIONS = ["Import Essay", "Upload a file"];
+
 const App = () => {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.only("xs"));
+
+  // Bin changes
+  const [animatedText, setAnimatedText] = useState<string>("");
+  const [value, setValue] = useState<number>(0);
+  const maxPercentage = useMemo(() => 37, []);
+
+  const [dropDownOpen, setDropDownOpen] = useState<boolean>(false);
+  const [dropDownIndex, setDropDownIndex] = useState<number>(0);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [fileStatus, setFileStatus] = useState({
+    status: "",
+    message: "",
+  });
+
+  const handleToggle = () => {
+    setDropDownOpen((prev) => !prev);
+    console.log("Got her");
+  };
+
+  const handleClose = (event: MouseEvent | TouchEvent) => {
+    if (
+      anchorRef.current &&
+      anchorRef.current.contains(event.target as Node)
+    ) {
+      return;
+    }
+    console.log("Got handle close");
+
+    setDropDownOpen(false);
+  };
+
+  const handleMenuItemClick = (
+    event: React.MouseEvent<HTMLLIElement, MouseEvent>,
+    index: number
+  ) => {
+    setDropDownIndex(index);
+    setDropDownOpen(false);
+    console.log("Got menu item close");
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log(e.target.files);
+    setFileStatus({ status: "loading", message: "loading" });
+
+    setTimeout(() => {
+      setFileStatus({ status: "done", message: "done" });
+    }, 5000);
+
+    setTimeout(() => {
+      setFileStatus({ status: "", message: "" });
+    }, 10000);
+  };
+
+  // animation
+  useEffect(() => {
+    let i: number = 0;
+
+    const animate = () => {
+      setAnimatedText(CANNED_FEEDBACK.slice(0, i));
+      i++;
+      if (i > CANNED_FEEDBACK.length - 1) clearInterval(interval);
+    };
+
+    const interval = setInterval(animate, 30);
+
+    const percentageInterval = setInterval(() => {
+      setValue((prev) => {
+        console.log(prev);
+
+        if (prev >= maxPercentage) {
+          clearInterval(percentageInterval);
+          return prev;
+        }
+
+        return prev + 1;
+      });
+    }, 40);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(percentageInterval);
+    };
+  }, []);
 
   return (
     <Box
@@ -138,8 +238,8 @@ const App = () => {
                 <Typography fontWeight={500}>AI Feedback</Typography>
               </Box>
               <Box ml={3}>
-                <Box maxWidth={200}>
-                  <Typography fontSize={"0.8rem"}>{CANNED_FEEDBACK}</Typography>
+                <Box maxWidth={200} height={170}>
+                  <Typography fontSize={"0.8rem"}>{animatedText}</Typography>
                 </Box>
               </Box>
             </Paper>
@@ -185,11 +285,15 @@ const App = () => {
                 <Typography fontSize={"0.9rem"}>
                   Probability AI generated
                 </Typography>{" "}
-                <Box width={"100%"} display={"flex"} justifyContent={"center"}>
+                <Box
+                  width={"100%"}
+                  display={"flex"}
+                  justifyContent={"center"}
+                >
                   <Gauge
                     width={100}
                     height={70}
-                    value={37}
+                    value={value}
                     startAngle={-90}
                     endAngle={90}
                     text={"37%"}
@@ -199,10 +303,13 @@ const App = () => {
             </Paper>
             <Paper
               sx={{
+                position: "relative",
                 padding: 3,
                 margin: 2,
                 borderRadius: 3,
-                display: "flex",
+                display: "grid",
+                justifyItems: "center",
+                gap: "10px",
                 minWidth: 320,
                 width: {
                   xs: "90%",
@@ -210,13 +317,19 @@ const App = () => {
                 },
               }}
             >
-              <Box
-                textAlign={"center"}
-                display={"flex"}
-                flexDirection={"column"}
-                justifyContent={"center"}
-                alignItems={"center"}
-              >
+              {fileInputRef.current && fileStatus.status === "done" ? (
+                <Box
+                  sx={{
+                    width: isXs ? "60px" : "70px",
+                    height: isXs ? "60px" : "70px",
+                    objectFit: "contain",
+                  }}
+                >
+                  <CloudDoneIcon color="success" sx={{ fontSize: 60 }} />
+                </Box>
+              ) : fileStatus.status === "loading" ? (
+                <div className="loader"></div>
+              ) : (
                 <Box
                   component="img"
                   src={GoogleClassroomIcon}
@@ -226,8 +339,91 @@ const App = () => {
                     objectFit: "contain",
                   }}
                 />
-                <Typography fontWeight={500}>Import Essays</Typography>
-              </Box>
+              )}
+              <ButtonGroup variant="contained" ref={anchorRef}>
+                <div>
+                  <Button
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                      console.log("Clicked on import");
+                    }}
+                    startIcon={
+                      dropDownIndex === 0 ? (
+                        <DriveFolderUploadIcon />
+                      ) : (
+                        <CloudUploadIcon />
+                      )
+                    }
+                  >
+                    {DROPDOWN_OPTIONS[dropDownIndex]}
+                  </Button>
+                  {DROPDOWN_OPTIONS[dropDownIndex] === "Upload a file" && (
+                    <input
+                      type="file"
+                      style={{
+                        height: "1px",
+                        width: "1px",
+                        overflow: "hidden",
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                    />
+                  )}
+                </div>
+                <Button
+                  size="small"
+                  aria-controls={
+                    dropDownOpen ? "split-button-menu" : undefined
+                  }
+                  aria-expanded={dropDownOpen ? "true" : undefined}
+                  aria-label="select merge strategy"
+                  aria-haspopup="menu"
+                  onClick={handleToggle}
+                >
+                  <ArrowDropDownIcon />
+                </Button>
+              </ButtonGroup>
+              <Popper
+                sx={{ zIndex: 1 }}
+                open={dropDownOpen}
+                anchorEl={anchorRef.current}
+                role={undefined}
+                transition
+              >
+                {({ TransitionProps, placement }) => (
+                  <Grow
+                    {...TransitionProps}
+                    style={{
+                      transformOrigin:
+                        placement === "bottom"
+                          ? "center top"
+                          : "center bottom",
+                    }}
+                  >
+                    <Paper>
+                      <ClickAwayListener onClickAway={handleClose}>
+                        <MenuList id="split-button-menu" autoFocusItem>
+                          {DROPDOWN_OPTIONS.map((option, index) => (
+                            <MenuItem
+                              key={option}
+                              selected={index === dropDownIndex}
+                              onClick={(event) =>
+                                handleMenuItemClick(event, index)
+                              }
+                            >
+                              {option}
+                            </MenuItem>
+                          ))}
+                        </MenuList>
+                      </ClickAwayListener>
+                    </Paper>
+                  </Grow>
+                )}
+              </Popper>
             </Paper>
             <Paper
               sx={{
@@ -235,6 +431,7 @@ const App = () => {
                 borderRadius: 3,
                 margin: 2,
                 display: "flex",
+                justifyContent: "center",
                 minWidth: 320,
                 width: {
                   xs: "90%",
